@@ -1,0 +1,115 @@
+stages:
+  - test
+  - lint
+  - coverage
+
+.test-common:
+  stage: test
+  needs: []
+  variables:
+    RUST_BACKTRACE: full
+  before_script:
+    - cargo install cargo2junit
+  script:
+    # Compile project
+    - cargo build
+    # Test project
+    - cargo test -- -Z unstable-options --format json | cargo2junit > results.xml
+  artifacts:
+    when: always
+    reports:
+      junit: results.xml
+
+test-binary/test-msrv:
+  extends:
+    - .test-common
+  image: rust:1.57-slim
+
+test-binary/test-stable:
+  extends:
+    - .test-common
+  image: rust:1-slim
+
+test-binary/test-nightly:
+  extends:
+    - .test-common
+  image: rustlang/rust:nightly-slim
+  allow_failure: true
+
+test-binary/lint:
+  image: rust:1-slim
+  stage: lint
+  needs: []
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+  before_script:
+    - apt-get update
+    # Required for native SSL, pulled in by cargo-rdme
+    - apt-get install -y -q pkg-config libssl-dev
+    - rustup component add clippy rustfmt
+    - cargo install cargo-rdme
+  script:
+    # Lint project
+    - cargo fmt --all -- --check --config error_on_line_overflow=true --config error_on_unformatted=true
+    - cargo clippy --all-targets -- -D warnings
+    - cargo rdme --check
+
+test-binary/coverage:
+  image: rust:1-slim
+  stage: coverage
+  needs: []
+  variables:
+    LLVM_PROFILE_FILE: "test-binary-%p-%m.profraw"
+    RUSTFLAGS: "-C instrument-coverage"
+    RUST_BACKTRACE: full
+  before_script:
+    # Cobertura parsing:
+    #   - xmlstarlet
+    #   - bc
+    # - Downloading and verifying codecov:
+    #   - curl
+    #   - gpg
+    - apt-get update
+    - apt-get install -y -q bc curl gpg xmlstarlet
+    # This is a dependency of Grcov.
+    - rustup component add llvm-tools-preview
+    - cargo install cargo2junit grcov
+    # Codecov.io installation
+    - >
+      curl https://keybase.io/codecovsecurity/pgp_keys.asc
+      | gpg --no-default-keyring --keyring trustedkeys.gpg --import
+    - curl -Os https://uploader.codecov.io/latest/linux/codecov
+    - curl -Os https://uploader.codecov.io/latest/linux/codecov.SHA256SUM
+    - curl -Os https://uploader.codecov.io/latest/linux/codecov.SHA256SUM.sig
+    - gpgv codecov.SHA256SUM.sig codecov.SHA256SUM
+    - sha256sum -c codecov.SHA256SUM
+    - chmod +x codecov
+  script:
+    # Test project to generate coverage data.
+    - cargo test
+    # Combine coverage information into Cobertura report.
+    - >
+      grcov .
+      --binary-path ./target/debug -s .
+      -t cobertura --branch --llvm
+      --ignore-not-existing --keep-only 'src/**' --ignore 'src/bin/test_*'
+      --excl-br-start "mod tests \{" --excl-start "mod tests \{"
+      --excl-br-line "#\[derive\(" --excl-line "#\[derive\("
+      -o cobertura.xml
+    # Upload results.
+    - ./codecov -R $CI_PROJECT_DIR
+    # Extract and print percentage from Cobertura. See Gitlab issue #21549
+    - >
+      export COVERAGE_DEC=$(
+      xmlstarlet sel -t -v "number(//coverage/@line-rate)"
+      <cobertura.xml 2>/dev/null
+      )
+    - export COVERAGE_PCT=$(echo "100 * $COVERAGE_DEC" | bc)
+    - printf "gitlab-coverage %s%%\n" "$COVERAGE_PCT"
+  coverage: '/^gitlab-coverage .+%$/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: cobertura.xml
