@@ -46,6 +46,16 @@ use std::ffi::OsString;
 use std::io::{BufReader, Read};
 use std::process::{Command, Stdio};
 
+/// Builds the binary crate we've prepared solely for the purposes of testing
+/// this library. This goes through cargo, so it should function identically to
+/// `cargo build --bin testbin`.
+pub fn build_mock_binary(name: &str) -> Result<OsString, TestBinaryError> {
+    build_mock_binary_with_opts(name, None, [])
+}
+
+/// Same as [`build_mock_binary()`] but accepts additional arguments to specify
+/// the build profile and features. To leave the profile as the default pass
+/// `None`.
 pub fn build_mock_binary_with_opts<'a, T>(
     name: &str,
     profile: Option<&str>,
@@ -110,13 +120,7 @@ where
     }
 }
 
-/// Builds the binary crate we've prepared solely for the purposes of testing
-/// this library. This goes through cargo, so it should function identically to
-/// `cargo build --bin testbin`.
-pub fn build_mock_binary(name: &str) -> Result<OsString, TestBinaryError> {
-    build_mock_binary_with_opts(name, None, [])
-}
-
+/// Error type for build result.
 #[derive(thiserror::Error, Debug)]
 pub enum TestBinaryError {
     #[error("error running cargo")]
