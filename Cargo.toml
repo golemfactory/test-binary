@@ -1,0 +1,52 @@
+[package]
+name = "test-binary"
+version = "1.0.0"
+authors = ["Jason Heeris <jason.heeris@gmail.com>"]
+description = "Build a program in the same crate for integration tests"
+keywords = [
+    "test",
+    "testing",
+    "cargo",
+    "binary",
+    "integration",
+]
+edition = "2021"
+license = "MIT"
+repository = "https://gitlab.com/detly/test-binary"
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]
+cargo_metadata = "0.13"
+thiserror = "1.0.29"
+
+[lib]
+doctest = true
+# See https://github.com/livioribeiro/cargo-readme/issues/32
+path = "src/lib.rs"
+
+# Use nightly features only when building docs, so we can get automatic
+# annotations on gated features.
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+# These are the test binaries we call in the integration tests.
+[features]
+test-doesnt-build = []
+
+[[bin]]
+bench = false
+test = false
+name = "test_it_builds"
+# See https://github.com/livioribeiro/cargo-readme/issues/32
+path = "src/bin/test_it_builds.rs"
+
+[[bin]]
+bench = false
+test = false
+name = "test_doesnt_build"
+# See https://github.com/livioribeiro/cargo-readme/issues/32
+path = "src/bin/test_doesnt_build.rs"
+required-features = ["test-doesnt-build"]
