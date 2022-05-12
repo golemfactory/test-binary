@@ -49,6 +49,10 @@ use std::ffi::OsString;
 use std::io::{BufReader, Read};
 use std::process::{Command, Stdio};
 
+// For the build_mock_binary_once macro.
+pub use once_cell;
+pub use paste;
+
 /// Builds the binary crate we've prepared solely for the purposes of testing
 /// this library. This goes through cargo, so it should function identically to
 /// `cargo build --bin testbin`.
@@ -164,9 +168,9 @@ pub enum TestBinaryError {
 #[macro_export]
 macro_rules! build_mock_binary_once {
     ($name:ident) => {
-        paste::paste! {
+        $crate::paste::paste! {
             pub fn [<$name _path>]() -> std::ffi::OsString {
-                use once_cell::sync::Lazy;
+                use $crate::once_cell::sync::Lazy;
                 use std::ffi::OsString;
 
                 static [<$name _path_lazy>]: Lazy<OsString> =
