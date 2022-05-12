@@ -17,9 +17,9 @@ in Rust, in the crate you're testing, as crate binaries themselves.
 
 This crate provides a simple interface for invoking Cargo to build test
 binaries in your own crate, defined in your `Cargo.toml`. Call
-[`build_mock_binary("name_of_binary")`] where `"name_of_binary"` is the
-binary name you'd pass to Cargo eg. `cargo build --bin name_of_binary`. If
-you need to change profiles or features, there is
+[`build_mock_binary("name_of_binary")`](build_mock_binary) where
+`"name_of_binary"` is the binary name you'd pass to Cargo eg. `cargo build
+--bin name_of_binary`. If you need to change profiles or features, there is
 [`build_mock_binary_with_opts()`].
 
 Here's an example of how you might use this in a test, with a binary named
