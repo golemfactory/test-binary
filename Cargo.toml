@@ -10,6 +10,10 @@ keywords = [
     "binary",
     "integration",
 ]
+categories = [
+    "development-tools",
+    "development-tools::testing",
+]
 edition = "2021"
 license = "MIT"
 repository = "https://gitlab.com/detly/test-binary"
