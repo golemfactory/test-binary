@@ -8,9 +8,9 @@
 //!
 //! This crate provides a simple interface for invoking Cargo to build test
 //! binaries in your own crate, defined in your `Cargo.toml`. Call
-//! [`build_mock_binary("name_of_binary")`] where `"name_of_binary"` is the
-//! binary name you'd pass to Cargo eg. `cargo build --bin name_of_binary`. If
-//! you need to change profiles or features, there is
+//! [`build_mock_binary("name_of_binary")`](build_mock_binary) where
+//! `"name_of_binary"` is the binary name you'd pass to Cargo eg. `cargo build
+//! --bin name_of_binary`. If you need to change profiles or features, there is
 //! [`build_mock_binary_with_opts()`].
 //!
 //! Here's an example of how you might use this in a test, with a binary named
@@ -138,6 +138,11 @@ pub enum TestBinaryError {
     BinaryNotFound(String),
 }
 
+/// Generate a singleton function to save invoking cargo multiple times for the
+/// same binary. This is useful when you have many integration tests that use
+/// the one test binary, and don't want to invoke Cargo over and over for each
+/// one.
+///
 /// Calling `build_mock_binary_once(binary_name)` (no quotes) will generate a
 /// function `binary_name_path()` that returns the path of the built test binary
 /// as an `OsString`, just like `build_mock_binary("binary_name")` would. Unlike
@@ -153,7 +158,9 @@ pub enum TestBinaryError {
 /// only be run once for this binary, even if the integration
 /// tests that use it are being run in multiple threads.
 ///
-/// See this module's own integration tests for an example.
+/// See this module's own integration tests for an example. If you need to use
+/// the extra arguments from [`build_mock_binary_with_opts()`] you will need to
+/// implement it manually.
 #[macro_export]
 macro_rules! build_mock_binary_once {
     ($name:ident) => {
