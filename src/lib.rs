@@ -41,6 +41,9 @@
 //! process' working directory, it will be valid as long as you do not change
 //! the working directory between obtaining it and using it.
 
+#![warn(missing_docs, missing_debug_implementations)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 use cargo_metadata::Message;
 use std::ffi::OsString;
 use std::io::{BufReader, Read};
@@ -123,10 +126,14 @@ where
 /// Error type for build result.
 #[derive(thiserror::Error, Debug)]
 pub enum TestBinaryError {
+    /// An error running cargo itself.
     #[error("error running cargo")]
     CargoRunError(#[from] std::io::Error),
+    /// Cargo ran but did not succeed.
     #[error("cargo failed (message is stderr only)")]
     CargoFailure(String),
+    /// Cargo ran and seemed to succeed but the requested binary did not appear
+    /// in its build output.
     #[error(r#"could not find binary "{0}" in cargo output"#)]
     BinaryNotFound(String),
 }
