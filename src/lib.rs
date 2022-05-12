@@ -130,3 +130,35 @@ pub enum TestBinaryError {
     #[error(r#"could not find binary "{0}" in cargo output"#)]
     BinaryNotFound(String),
 }
+
+/// Calling `build_mock_binary_once(binary_name)` (no quotes) will generate a
+/// function `binary_name_path()` that returns the path of the built test binary
+/// as an `OsString`, just like `build_mock_binary("binary_name")` would. Unlike
+/// `build_mock_binary("binary_name")`, the generated function will only build
+/// the binary once, and only on the first call. Subsequent calls will use a
+/// cached path and assume the initial build is still valid. The generated
+/// function unwraps the result internally and will panic on build errors.
+///
+/// For example, if you use `build_mock_binary_once(test_it_builds)` in
+/// `tests/common/mod.rs`, that module will then contain a function
+/// `test_it_builds_path() -> std::ffi::OsString`. Multiple integration tests
+/// can then use `common::test_it_builds_path()` to obtain the path. Cargo will
+/// only be run once for this binary, even if the integration
+/// tests that use it are being run in multiple threads.
+///
+/// See this module's own integration tests for an example.
+#[macro_export]
+macro_rules! build_mock_binary_once {
+    ($name:ident) => {
+        paste::paste! {
+            pub fn [<$name _path>]() -> std::ffi::OsString {
+                use once_cell::sync::Lazy;
+                use std::ffi::OsString;
+
+                static [<$name _path_lazy>]: Lazy<OsString> =
+                    Lazy::new(|| $crate::build_mock_binary(stringify!($name)).unwrap());
+                [<$name _path_lazy>].clone()
+            }
+        }
+    };
+}
