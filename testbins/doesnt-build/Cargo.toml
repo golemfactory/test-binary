@@ -1,0 +1,9 @@
+[package]
+name = "test-binary-doesnt-build"
+version = "1.0.0"
+edition = "2021"
+description = "Part of the test-binary crate"
+authors = ["Jason Heeris <jason.heeris@gmail.com>"]
+license = "MIT"
+repository = "https://gitlab.com/detly/test-binary"
+

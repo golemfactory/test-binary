@@ -38,23 +38,3 @@ path = "src/lib.rs"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-# These are the test binaries we call in the integration tests.
-[features]
-test-doesnt-build = []
-
-[[bin]]
-bench = false
-test = false
-name = "test_it_builds"
-
-[[bin]]
-bench = false
-test = false
-name = "test_multiple"
-
-
-[[bin]]
-bench = false
-test = false
-name = "test_doesnt_build"
-required-features = ["test-doesnt-build"]
