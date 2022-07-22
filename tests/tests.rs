@@ -22,18 +22,20 @@ fn test_release() {
     assert!(PathBuf::from(result.unwrap()).ends_with("test_it_builds"));
 }
 
-/// Test that building a binary that doesn't build produces an error. Also tests
-/// building with extra features.
+/// Test that building a binary that doesn't build produces an error.
 #[test]
 fn test_doesnt_build() {
-    let result = build_mock_binary_with_opts("test_doesnt_build", None, ["test-doesnt-build"]);
-    assert!(matches!(result, Err(TestBinaryError::CargoFailure(_))));
+    let result = build_mock_binary("test_doesnt_build");
+    assert!(matches!(result, Err(TestBinaryError::BuildError(_))));
 }
 
-/// Test that building a binary that doesn't exist produces an error.
+/// Test that building a binary that doesn't exist produces an error. Note that
+/// there is no (stable, reliable) way to distinguish errors above the level of
+/// build failures, because they don't appear in the JSON output but rather, as
+/// prose on stderr.
 #[test]
 fn test_doesnt_exist() {
-    let result = build_mock_binary_with_opts("test_doesnt_build", None, []);
+    let result = build_mock_binary_with_opts("test_doesnt_exist", None, []);
     assert!(matches!(result, Err(TestBinaryError::CargoFailure(_))));
 }
 

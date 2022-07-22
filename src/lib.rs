@@ -136,6 +136,9 @@ pub enum TestBinaryError {
     /// Cargo ran but did not succeed.
     #[error("cargo failed (message is stderr only)")]
     CargoFailure(String),
+    /// Cargo ran but there was a compilation error.
+    #[error("build error: {0}")]
+    BuildError(String),
     /// Cargo ran and seemed to succeed but the requested binary did not appear
     /// in its build output.
     #[error(r#"could not find binary "{0}" in cargo output"#)]
