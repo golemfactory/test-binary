@@ -1,5 +1,5 @@
 [package]
-name = "test-binary-doesnt-build"
+name = "doesnt-build"
 version = "1.0.0"
 edition = "2021"
 description = "Part of the test-binary crate"
