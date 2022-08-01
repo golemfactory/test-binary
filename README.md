@@ -78,7 +78,9 @@ With this setup, you can now call [`build_test_binary("test-something",
   containing this test binary project (and maybe others)
 
 If you need to change profiles or features, or have more control over the
-directory structure, there is also [a builder API](TestBinary).
+directory structure, there is also [a builder API](TestBinary). Also see
+[`build_test_binary_once!()`](build_mock_binary_once) for a macro that
+lazily builds the binary and caches the path.
 
 Here's an example of how you might use this in a test, with a binary named
 `does-build`:

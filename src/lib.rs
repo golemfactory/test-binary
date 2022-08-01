@@ -69,7 +69,9 @@
 //!   containing this test binary project (and maybe others)
 //!
 //! If you need to change profiles or features, or have more control over the
-//! directory structure, there is also [a builder API](TestBinary).
+//! directory structure, there is also [a builder API](TestBinary). Also see
+//! [`build_test_binary_once!()`](build_mock_binary_once) for a macro that
+//! lazily builds the binary and caches the path.
 //!
 //! Here's an example of how you might use this in a test, with a binary named
 //! `does-build`:
@@ -113,7 +115,9 @@ use std::process::{Command, Stdio};
 pub use once_cell;
 pub use paste;
 
-macro_rules! args {
+// Internal macros for OsString boilerplate.
+
+macro_rules! vec_oss {
     ($($item:expr),* $(,)?) => {
         vec![
             $(::std::ffi::OsString::from($item),)+
@@ -121,42 +125,77 @@ macro_rules! args {
     };
 }
 
-macro_rules! add_arg {
+macro_rules! push_oss {
     ($args:expr, $item:expr) => {
         $args.push(::std::ffi::OsString::from($item))
     };
 }
 
+/// Builder constructor for a test binary.
+///
+/// Start with [`TestBinary::relative_to_parent(name,
+/// manifest)`](TestBinary::relative_to_parent) where
+/// - `name` is the name of the binary in the child project's manifest
+/// - `manifest` is the path to the manifest file for the test binary, relative
+///   to the directory that the containing project is in. It should probably end
+///   in `Cargo.toml`.
+///
+/// Note that you can pass a path in a cross-platform way by using
+/// [`PathBuf::from_iter()`][std::path::PathBuf::from_iter()]:
+///
+/// ```
+/// # use std::path::PathBuf;
+/// # use test_binary::TestBinary;
+/// TestBinary::relative_to_parent(
+///     "does-build",
+///     &PathBuf::from_iter(["testbins", "does-build", "Cargo.toml"]),
+/// );
+/// ```
+#[derive(Debug)]
 pub struct TestBinary<'a> {
     binary: &'a str,
     manifest: &'a Path,
     features: Vec<&'a str>,
+    default_features: bool,
     profile: Option<&'a str>,
 }
 
 impl<'a> TestBinary<'a> {
+    /// Creates a new `TestBinary` by specifying the child binary's manifest
+    /// relative to the parent.
     pub fn relative_to_parent(name: &'a str, manifest: &'a Path) -> Self {
         Self {
             binary: name,
             manifest,
             features: vec![],
+            default_features: true,
             profile: None,
         }
     }
 
+    /// Specifies a profile to build the test binary with.
     pub fn with_profile(&mut self, profile: &'a str) -> &mut Self {
         self.profile = Some(profile);
         self
     }
 
+    /// Specifies not to enable default features.
+    pub fn no_default_features(&mut self) -> &mut Self {
+        self.default_features = false;
+        self
+    }
+
+    /// Specifies a feature to enable for the test binary. These are additive,
+    /// so if you call this multiple times all the features you specify will be
+    /// enabled.
     pub fn with_feature(&mut self, feature: &'a str) -> &mut Self {
         self.features.push(feature);
         self
     }
 
-    /// Builds the binary crate we've prepared solely for the purposes of
-    /// testing this library. This goes through cargo, so it should function
-    /// identically to `cargo build --bin testbin`.
+    /// Builds the binary crate we've prepared. This goes through cargo, so it
+    /// should function identically to `cargo build --bin testbin` along with
+    /// any additional flags from the builder methods.
     pub fn build(&mut self) -> Result<OsString, TestBinaryError> {
         fn get_cargo_env_or_panic(key: &str) -> OsString {
             std::env::var_os(key).unwrap_or_else(|| {
@@ -175,7 +214,7 @@ impl<'a> TestBinary<'a> {
         let mut manifest_path = PathBuf::from(get_cargo_env_or_panic("CARGO_MANIFEST_DIR"));
         manifest_path.push(self.manifest);
 
-        let mut cargo_args = args![
+        let mut cargo_args = vec_oss![
             "build",
             "--message-format=json",
             "-q",
@@ -186,13 +225,17 @@ impl<'a> TestBinary<'a> {
         ];
 
         if let Some(prof) = self.profile {
-            add_arg!(cargo_args, "--profile");
-            add_arg!(cargo_args, prof);
+            push_oss!(cargo_args, "--profile");
+            push_oss!(cargo_args, prof);
+        }
+
+        if !self.default_features {
+            push_oss!(cargo_args, "--no-default-features");
         }
 
         for feature in &self.features {
-            add_arg!(cargo_args, "--features");
-            add_arg!(cargo_args, feature);
+            push_oss!(cargo_args, "--features");
+            push_oss!(cargo_args, feature);
         }
 
         let mut cargo_command = Command::new(cargo_path)
@@ -257,6 +300,14 @@ impl<'a> TestBinary<'a> {
     }
 }
 
+/// Simplified function for building a test binary where the binary is in a
+/// subdirectory of the same name, the manifest is named `Cargo.toml`, and you
+/// don't need any non-default features or to specify a profile.
+///
+/// For example, if your parent contains the child binary in
+/// `testbins/does-build`, and the binary is named `does-build` in its
+/// `Cargo.toml`, then you can just call `build_test_binary("does_build",
+/// "testbins")`.
 pub fn build_test_binary<R: AsRef<Path>>(
     name: &str,
     directory: R,
@@ -311,6 +362,9 @@ pub enum TestBinaryError {
 /// then use `common::path_to_my_test()` to obtain the path. Cargo will only be
 /// run once for this binary, even if the integration tests that use it are
 /// being run in multiple threads.
+///
+/// > Note that this means the binary name must be a valid identifier eg. not
+/// > have dashes in it.
 ///
 /// See this module's own integration tests for an example. If you need to use
 /// extra features or a non-default profile, you will need to go back to using
