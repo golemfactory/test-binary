@@ -73,3 +73,17 @@ fn test_multiple_calls_4() {
     let result = path_to_multiple();
     assert_path_end(result, "multiple");
 }
+
+// Test disabling default features and adding features.
+#[test]
+fn test_features() {
+    let result = TestBinary::relative_to_parent(
+        "feature-test",
+        &PathBuf::from_iter(["testbins", "feature-test", "Cargo.toml"]),
+    )
+    .no_default_features()
+    .with_feature("working")
+    .build();
+
+    assert_path_end(result.unwrap(), "feature-test");
+}
