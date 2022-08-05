@@ -50,7 +50,12 @@ test-binary/lint:
     - cargo install cargo-rdme
   script:
     # Lint project
-    - cargo fmt --all -- --check --config error_on_line_overflow=true --config error_on_unformatted=true
+
+    # I'd like to use --config error_on_line_overflow=true
+    # --config error_on_unformatted=true here here, but I can't because certain
+    # URLs put the line length over the limit and there's nothing to be done.
+    # See https://github.com/rust-lang/rustfmt/issues/5477
+    - cargo fmt --all -- --check
     - cargo clippy --all-targets -- -D warnings
     - cargo rdme --check
 

@@ -1,0 +1,13 @@
+[package]
+name = "does-build"
+version = "1.0.0"
+edition = "2021"
+description = "Part of the test-binary crate"
+authors = ["Jason Heeris <jason.heeris@gmail.com>"]
+license = "MIT"
+repository = "https://gitlab.com/detly/test-binary"
+
+# A deliberately empty workspace section so that Cargo doesn't try to search
+# upwards, just in case the parent manifest is broken. See:
+# https://github.com/rust-lang/cargo/issues/10872#issuecomment-1186112506
+[workspace]
