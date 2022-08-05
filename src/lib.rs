@@ -197,21 +197,19 @@ impl<'a> TestBinary<'a> {
     /// should function identically to `cargo build --bin testbin` along with
     /// any additional flags from the builder methods.
     pub fn build(&mut self) -> Result<OsString, TestBinaryError> {
-        fn get_cargo_env_or_panic(key: &str) -> OsString {
-            std::env::var_os(key).unwrap_or_else(|| {
-                panic!(
+        fn get_cargo_env(key: &str) -> Result<OsString, TestBinaryError> {
+            std::env::var_os(key).ok_or_else(|| {
+                TestBinaryError::NonCargoRun(format!(
                     "{} '{}' {}",
-                    "The environment variable ",
-                    key,
-                    "is not set, is this running under a 'cargo test' command?"
-                )
+                    "The environment variable ", key, "is not set",
+                ))
             })
         }
 
-        let cargo_path = get_cargo_env_or_panic("CARGO");
+        let cargo_path = get_cargo_env("CARGO")?;
 
         // Resolve test binary project manifest.
-        let mut manifest_path = PathBuf::from(get_cargo_env_or_panic("CARGO_MANIFEST_DIR"));
+        let mut manifest_path = PathBuf::from(get_cargo_env("CARGO_MANIFEST_DIR")?);
         manifest_path.push(self.manifest);
 
         let mut cargo_args = vec_oss![
@@ -322,6 +320,9 @@ pub fn build_test_binary<R: AsRef<Path>>(
 /// Error type for build result.
 #[derive(thiserror::Error, Debug)]
 pub enum TestBinaryError {
+    /// We are not running under Cargo.
+    #[error("{0}; is this running under a 'cargo test' command?")]
+    NonCargoRun(String),
     /// An error running cargo itself.
     #[error("IO error running Cargo")]
     CargoRunError(#[from] std::io::Error),
