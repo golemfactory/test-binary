@@ -1,6 +1,6 @@
 [package]
 name = "test-binary"
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Jason Heeris <jason.heeris@gmail.com>"]
 description = "Build a program under a crate for integration tests"
 keywords = [

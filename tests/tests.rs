@@ -34,7 +34,7 @@ fn test_release() {
 #[test]
 fn test_doesnt_build() {
     let result = build_test_binary("doesnt-build", "testbins");
-    assert!(matches!(result, Err(TestBinaryError::BuildError)));
+    assert!(matches!(result, Err(TestBinaryError::BuildError(_))));
 }
 
 // Test that building a binary that doesn't exist produces an error. Note that
