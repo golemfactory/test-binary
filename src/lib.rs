@@ -102,13 +102,14 @@
 //! process' working directory, it will be valid as long as you do not change
 //! the working directory between obtaining it and using it.
 
+#![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use cargo_metadata::Message;
+mod stream;
+
 use std::{
     ffi::OsString,
-    fmt::Write as _,
     io::{BufReader, Read},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -260,48 +261,7 @@ impl<'a> TestBinary<'a> {
                 .expect("cargo subprocess output has already been claimed"),
         );
 
-        let messages = Message::parse_stream(reader);
-
-        let mut cargo_outcome = None;
-        // Keep these in case the build fails.
-        let mut compiler_messages = String::new();
-
-        for message in messages.flatten() {
-            match message {
-                // Hooray we found it!
-                Message::CompilerArtifact(artf) if (artf.target.name == self.binary) => {
-                    cargo_outcome = Some(artf.executable.ok_or_else(|| {
-                        // Wait no we didn't.
-                        TestBinaryError::BinaryNotBuilt(self.binary.to_owned())
-                    }));
-                    break;
-                }
-
-                // Let's keep these just in case.
-                Message::CompilerMessage(msg) => {
-                    writeln!(compiler_messages, "{}", msg).expect("error writing to String");
-                }
-                Message::TextLine(text) => {
-                    writeln!(compiler_messages, "{}", text).expect("error writing to String");
-                }
-
-                // Hooray it's finished!
-                Message::BuildFinished(build_result) => {
-                    cargo_outcome = if build_result.success {
-                        cargo_outcome.or_else(|| {
-                            // Wait our binary isn't there.
-                            Some(Err(TestBinaryError::BinaryNotBuilt(self.binary.to_owned())))
-                        })
-                    } else {
-                        // Wait it failed.
-                        Some(Err(TestBinaryError::BuildError(compiler_messages)))
-                    };
-                    break;
-                }
-
-                _ => continue,
-            }
-        }
+        let cargo_outcome = stream::process_messages(reader, self.binary);
 
         // See above re. stderr being None.
         let mut error_reader = BufReader::new(
@@ -312,7 +272,6 @@ impl<'a> TestBinary<'a> {
         );
 
         let mut error_msg = String::new();
-
         error_reader.read_to_string(&mut error_msg)?;
 
         if cargo_command.wait()?.success() {
