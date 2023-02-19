@@ -9,7 +9,7 @@ stages:
   variables:
     RUST_BACKTRACE: full
   before_script:
-    - cargo install cargo2junit
+    - cargo install --version 0.1.10 cargo2junit
   script:
     # Compile project
     - cargo build

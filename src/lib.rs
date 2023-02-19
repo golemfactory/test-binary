@@ -105,11 +105,14 @@
 #![warn(missing_docs, missing_debug_implementations)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use cargo_metadata::{BuildFinished, Message};
-use std::ffi::OsString;
-use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use cargo_metadata::Message;
+use std::{
+    ffi::OsString,
+    fmt::Write as _,
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+};
 
 // For the build_mock_binary_once macro.
 pub use once_cell;
@@ -243,31 +246,68 @@ impl<'a> TestBinary<'a> {
             .spawn()?;
 
         let reader = BufReader::new(
-            // The child process' stdout being None is legitimately a programming
-            // error, since we created it ourselves two lines ago.
+            // The child process' stdout being None is legitimately a
+            // programming error, since we created it ourselves two lines ago.
+            //
+            // Use as_mut() instead of take() here because if we detach
+            // ownership from the subprocess, we risk letting it drop
+            // prematurely, which can make it close before the subprocess is
+            // finished, resulting in a broken pipe error (but in a highly
+            // timing/platform/performance dependent and intermittent way).
             cargo_command
                 .stdout
-                .take()
+                .as_mut()
                 .expect("cargo subprocess output has already been claimed"),
         );
 
-        let mut messages = Message::parse_stream(reader);
-        let cargo_outcome = messages.find_map(|m| match m {
-            Ok(Message::CompilerArtifact(artf)) if (artf.target.name == self.binary) => Some(
-                artf.executable
-                    .ok_or_else(|| TestBinaryError::BinaryNotBuilt(self.binary.to_owned())),
-            ),
-            Ok(Message::BuildFinished(BuildFinished { success: false, .. })) => {
-                Some(Err(TestBinaryError::BuildError))
+        let messages = Message::parse_stream(reader);
+
+        let mut cargo_outcome = None;
+        // Keep these in case the build fails.
+        let mut compiler_messages = String::new();
+
+        for message in messages.flatten() {
+            match message {
+                // Hooray we found it!
+                Message::CompilerArtifact(artf) if (artf.target.name == self.binary) => {
+                    cargo_outcome = Some(artf.executable.ok_or_else(|| {
+                        // Wait no we didn't.
+                        TestBinaryError::BinaryNotBuilt(self.binary.to_owned())
+                    }));
+                    break;
+                }
+
+                // Let's keep these just in case.
+                Message::CompilerMessage(msg) => {
+                    writeln!(compiler_messages, "{}", msg).expect("error writing to String");
+                }
+                Message::TextLine(text) => {
+                    writeln!(compiler_messages, "{}", text).expect("error writing to String");
+                }
+
+                // Hooray it's finished!
+                Message::BuildFinished(build_result) => {
+                    cargo_outcome = if build_result.success {
+                        cargo_outcome.or_else(|| {
+                            // Wait our binary isn't there.
+                            Some(Err(TestBinaryError::BinaryNotBuilt(self.binary.to_owned())))
+                        })
+                    } else {
+                        // Wait it failed.
+                        Some(Err(TestBinaryError::BuildError(compiler_messages)))
+                    };
+                    break;
+                }
+
+                _ => continue,
             }
-            _ => None,
-        });
+        }
 
         // See above re. stderr being None.
         let mut error_reader = BufReader::new(
             cargo_command
                 .stderr
-                .take()
+                .as_mut()
                 .expect("cargo subprocess error output has already been claimed"),
         );
 
@@ -330,8 +370,8 @@ pub enum TestBinaryError {
     #[error("Cargo failed, stderr: {0}")]
     CargoFailure(String),
     /// Cargo ran but there was a compilation error.
-    #[error("build error")]
-    BuildError,
+    #[error("build error:\n{0}")]
+    BuildError(String),
     /// Cargo ran and seemed to succeed but the requested binary did not appear
     /// in its build output.
     #[error(r#"could not find binary "{0}" in Cargo output"#)]
