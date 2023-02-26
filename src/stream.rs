@@ -61,3 +61,109 @@ pub(super) fn process_messages<R: BufRead>(
 
     cargo_outcome
 }
+
+#[cfg(test)]
+mod tests {
+    //! The "good" path is mostly tested by integration tests. These mostly test
+    //! the error handling and rendering.
+
+    use super::*;
+    use indoc::indoc;
+
+    #[test]
+    fn regular_error() {
+        let binary = "fla";
+        let json_output = indoc! {r##"
+{"reason":"compiler-message","package_id":"fla 0.1.0 (path+file:///test-binary/testbins/fla)","manifest_path":"/test-binary/testbins/fla/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"fla","src_path":"/test-binary/testbins/fla/src/main.rs","edition":"2021","doc":true,"doctest":false,"test":true},"message":{"rendered":"error: unknown start of token: \\u{1f9a9}\n --> src/main.rs:1:13\n  |\n1 | fn main() { 🦩 }\n  |             ^^\n\n","children":[],"code":null,"level":"error","message":"unknown start of token: \\u{1f9a9}","spans":[{"byte_end":16,"byte_start":12,"column_end":14,"column_start":13,"expansion":null,"file_name":"src/main.rs","is_primary":true,"label":null,"line_end":1,"line_start":1,"suggested_replacement":null,"suggestion_applicability":null,"text":[{"highlight_end":14,"highlight_start":13,"text":"fn main() { 🦩 }"}]}]}}
+{"reason":"compiler-message","package_id":"fla 0.1.0 (path+file:///test-binary/testbins/fla)","manifest_path":"/test-binary/testbins/fla/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"fla","src_path":"/test-binary/testbins/fla/src/main.rs","edition":"2021","doc":true,"doctest":false,"test":true},"message":{"rendered":"error: aborting due to previous error\n\n","children":[],"code":null,"level":"error","message":"aborting due to previous error","spans":[]}}
+{"reason":"build-finished","success":false}
+"##};
+
+        let expected_msg = indoc! {r#"
+error: unknown start of token: \u{1f9a9}
+ --> src/main.rs:1:13
+  |
+1 | fn main() { 🦩 }
+  |             ^^
+
+
+error: aborting due to previous error
+
+
+"#};
+
+        let outcome = process_messages(std::io::Cursor::new(json_output), binary);
+
+        if let Some(Err(TestBinaryError::BuildError(msg))) = outcome {
+            assert_eq!(msg, expected_msg);
+        } else {
+            panic!("{:#?}", outcome);
+        }
+    }
+
+    #[test]
+    fn error_with_line() {
+        let binary = "fla";
+        let json_output = indoc! {r##"
+{"reason":"compiler-message","package_id":"fla 0.1.0 (path+file:///test-binary/testbins/fla)","manifest_path":"/test-binary/testbins/fla/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"fla","src_path":"/test-binary/testbins/fla/src/main.rs","edition":"2021","doc":true,"doctest":false,"test":true},"message":{"rendered":"error: unknown start of token: \\u{1f9a9}\n --> src/main.rs:1:13\n  |\n1 | fn main() { 🦩 }\n  |             ^^\n\n","children":[],"code":null,"level":"error","message":"unknown start of token: \\u{1f9a9}","spans":[{"byte_end":16,"byte_start":12,"column_end":14,"column_start":13,"expansion":null,"file_name":"src/main.rs","is_primary":true,"label":null,"line_end":1,"line_start":1,"suggested_replacement":null,"suggestion_applicability":null,"text":[{"highlight_end":14,"highlight_start":13,"text":"fn main() { 🦩 }"}]}]}}
+Surprise text line!
+{"reason":"compiler-message","package_id":"fla 0.1.0 (path+file:///test-binary/testbins/fla)","manifest_path":"/test-binary/testbins/fla/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"fla","src_path":"/test-binary/testbins/fla/src/main.rs","edition":"2021","doc":true,"doctest":false,"test":true},"message":{"rendered":"error: aborting due to previous error\n\n","children":[],"code":null,"level":"error","message":"aborting due to previous error","spans":[]}}
+{"reason":"build-finished","success":false}
+"##};
+
+        let expected_msg = indoc! {r#"
+error: unknown start of token: \u{1f9a9}
+ --> src/main.rs:1:13
+  |
+1 | fn main() { 🦩 }
+  |             ^^
+
+
+Surprise text line!
+error: aborting due to previous error
+
+
+"#};
+
+        let outcome = process_messages(std::io::Cursor::new(json_output), binary);
+
+        if let Some(Err(TestBinaryError::BuildError(msg))) = outcome {
+            assert_eq!(msg, expected_msg);
+        } else {
+            panic!("{:#?}", outcome);
+        }
+    }
+
+    #[test]
+    fn build_with_no_binary() {
+        let binary = "fla";
+        let json_output = indoc! {r##"
+{"reason":"compiler-artifact","package_id":"fla 0.1.0 (path+file:///test-binary/testbins/fla)","manifest_path":"/test-binary/testbins/fla/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"fla","src_path":"/test-binary/testbins/fla/src/main.rs","edition":"2021","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/test-binary/testbins/fla/target/debug/fla"],"fresh":false}
+{"reason":"build-finished","success":true}
+"##};
+
+        let outcome = process_messages(std::io::Cursor::new(json_output), binary);
+
+        if let Some(Err(TestBinaryError::BinaryNotBuilt(name))) = outcome {
+            assert_eq!(name, binary);
+        } else {
+            panic!("{:#?}", outcome);
+        }
+    }
+
+    #[test]
+    fn build_finish_early() {
+        let binary = "fla";
+        let json_output = indoc! {r##"
+{"reason":"build-finished","success":true}
+"##};
+
+        let outcome = process_messages(std::io::Cursor::new(json_output), binary);
+
+        if let Some(Err(TestBinaryError::BinaryNotBuilt(name))) = outcome {
+            assert_eq!(name, binary);
+        } else {
+            panic!("{:#?}", outcome);
+        }
+    }
+}

@@ -106,8 +106,6 @@
 #![warn(missing_docs, missing_debug_implementations)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-mod stream;
-
 use std::{
     ffi::OsString,
     io::{BufReader, Read},
@@ -118,6 +116,8 @@ use std::{
 // For the build_mock_binary_once macro.
 pub use once_cell;
 pub use paste;
+
+mod stream;
 
 // Internal macros for OsString boilerplate.
 
