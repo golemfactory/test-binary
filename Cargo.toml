@@ -18,6 +18,14 @@ edition = "2021"
 license = "MIT"
 repository = "https://gitlab.com/rust-test-binary/test-binary/"
 homepage = "https://gitlab.com/rust-test-binary/test-binary/"
+# Note that by default Cargo will not include any sub-packages in a package.
+# This really means that any such projects *under* "testbins" will be excluded.
+# Here we exclude the entire "testbins" directory altogether, because it is not
+# necessary for the package.
+exclude = [
+    ".gitlab-ci.yml",
+    "testbins/**"
+]
 
 [badges]
 maintenance = { status = "actively-developed" }
