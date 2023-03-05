@@ -1,33 +1,55 @@
 //! Test binary generation for integration tests under Cargo.
 //!
-//! > ## Note
-//! >
-//! > This crate primarily exists to work around [Cargo issue #1982][cargo-1982]. If
-//! > that has been fixed, you probably don't need this.
-//!
-//!   [cargo-1982]: https://github.com/rust-lang/cargo/issues/1982
-//!
 //! If you have integration tests for things that involve subprocess management,
 //! inter-process communication, or platform tools, you might need to write some
-//! mock binaries of your own to test against. And if you're already using Cargo
-//! to build and test, it would be nice to be able to write those test binaries
-//! in Rust, near to the crate you're testing, as cargo projects themselves.
+//! mock binaries of your own to test against. For example, if you want to test
+//! that your code does the right thing when processing exit status codes for a
+//! subprocess it manages, you might want a test binary that simply exits with a
+//! certain status code. If you're testing your side of an IPC exchange, you'll
+//! need a binary that sends the right replies.
+//!
+//! And if you're already using Cargo to build and test, it would be nice to be
+//! able to write those test binaries in Rust, near to the crate you're testing,
+//! as cargo projects themselves. Then at least you'll know that your test
+//! environments will already have the right toolchain installed.
 //!
 //! This crate provides a simple interface for invoking Cargo to build test
-//! binaries organised in a separate directory under your crate.
+//! binaries organised in a separate directory under your crate. *To some extent
+//! this is already possible without using this crate at all!* If you want a
+//! mock binary, you could put it under your `src/bin` or `examples` directory
+//! and use it that way.
+//!
+//! But there are reasons to use this crate instead:
+//!
+//! - Crate binaries eg. under `src/bin`, or listed under `[[bin]]` in
+//!   `Cargo.toml`, can be found when running tests via the environment variable
+//!   [`CARGO_BIN_EXE_<name>`][cargo-env]. But they have to share dependencies
+//!   with your entire crate! So whatever your mock binaries depend on, your
+//!   entire crate has to depend on as well. This is discussed in [Cargo issue
+//!   #1982][cargo-1982]
+//!
+//!     [cargo-env]: https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-crates
+//!     [cargo-1982]: https://github.com/rust-lang/cargo/issues/1982
+//!
+//! - Example binaries (under `examples/` or `[[example]]`) use
+//!   `[dev-dependencies]` instead. But they have no equivalent environment
+//!   variable, and might not be built by the time your test runs.
+//!
+//! - More philosophically, mock binaries are not examples. They might not use
+//!   any aspect of your crate whatsoever. They might deliberately malfunction.
+//!   It might be confusing to end users to find these alongside your other
+//!   examples. It might just not be the kind of organisation you want for your
+//!   tests.
+//!
+//! This crate provides a way to work around those limitations.
 //!
 //! The first thing to note is that these test binaries *aren't* binaries listed
-//! in your actual project's manifest. If that's what you have and it works, you
-//! don't need this crate at all — you can just use
-//! [`CARGO_BIN_EXE_<name>`][cargo-env].
+//! in your actual project's manifest. So start by picking a directory name and
+//! put them in there eg. this project uses `testbins`. **This is not going to
+//! be a workspace.**
 //!
-//!   [cargo-env]: https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-crates
-//!
-//! But maybe the test binaries have to be made into separate projects because
-//! they have extra dependencies. Pick a directory name and put them in there
-//! eg. this project uses `testbins`. *This is not going to be a workspace.*
 //! Under this directory you will have each test binary as a separate Cargo
-//! project, just like any other Rust binary.
+//! binary project.
 //!
 //! The structure should look something like this:
 //!
@@ -60,18 +82,18 @@
 //!   [cargo-10872]: https://github.com/rust-lang/cargo/issues/10872
 //!
 //! With this setup, you can now call [`build_test_binary("test-something",
-//! "testdir")`](build_test_binary) where:
+//! "testbins")`](crate::build_test_binary) where:
 //!
-//! - `"test-something"` is the binary name you'd pass to Cargo in the child
-//!   project eg. `cargo build --bin test-something`; it also has to be the name
-//!   of the subdirectory this project is in
-//! - `"testdir"` is the directory relative to your real project's manifest
+//! - `"test-something"` is the binary name you'd pass to Cargo *in the child
+//!   project* eg. `cargo build --bin test-something`; it also has to be the
+//!   name of the subdirectory this project is in
+//! - `"testbins"` is the directory relative to your real project's manifest
 //!   containing this test binary project (and maybe others)
 //!
 //! If you need to change profiles or features, or have more control over the
-//! directory structure, there is also [a builder API](TestBinary). Also see
-//! [`build_test_binary_once!()`](build_mock_binary_once) for a macro that
-//! lazily builds the binary and caches the path.
+//! directory structure, there is also [a builder API](crate::TestBinary). Also
+//! see [`build_test_binary_once!()`](crate::build_test_binary_once) for a macro
+//! that lazily builds the binary and caches the path.
 //!
 //! Here's an example of how you might use this in a test, with a binary named
 //! `does-build`:
@@ -113,7 +135,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-// For the build_mock_binary_once macro.
+// For the build_test_binary_once macro.
 pub use once_cell;
 pub use paste;
 
