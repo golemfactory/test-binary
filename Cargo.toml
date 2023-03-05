@@ -16,7 +16,8 @@ categories = [
 ]
 edition = "2021"
 license = "MIT"
-repository = "https://gitlab.com/detly/test-binary"
+repository = "https://gitlab.com/rust-test-binary/test-binary/"
+homepage = "https://gitlab.com/rust-test-binary/test-binary/"
 
 [badges]
 maintenance = { status = "actively-developed" }
