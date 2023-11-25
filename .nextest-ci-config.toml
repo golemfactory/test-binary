@@ -1,0 +1,6 @@
+[profile.default]
+status-level = "all"
+fail-fast = false
+
+[profile.default.junit]
+path = "test-results.xml"

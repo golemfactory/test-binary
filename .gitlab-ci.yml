@@ -7,18 +7,25 @@ stages:
   stage: test
   needs: []
   variables:
+    DEBIAN_FRONTEND: noninteractive
     RUST_BACKTRACE: full
   before_script:
-    - cargo install --version 0.1.10 cargo2junit
+    - apt-get update
+    # Downloading cargo-nextest:
+    #   - curl
+    - apt-get install -y -q curl
+    - curl --silent --fail --show-error --location https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:?}/bin
   script:
-    # Compile project
-    - cargo build
-    # Test project
-    - cargo test -- -Z unstable-options --format json | cargo2junit > results.xml
+    # Test project (with cargo-nextest)
+    - cargo nextest --config-file $CI_PROJECT_DIR/.nextest-ci-config.toml run --workspace
+    # Cargo-nextest does not support running doctests. Run them here to ensure
+    # they build and pass, but they won't contribute to coverage data nor appear
+    # in test reports.
+    - cargo test --doc
   artifacts:
     when: always
     reports:
-      junit: results.xml
+      junit: "$CI_PROJECT_DIR/target/nextest/default/test-results.xml"
 
 test-binary/test-msrv:
   extends:
