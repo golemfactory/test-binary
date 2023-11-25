@@ -433,12 +433,12 @@ macro_rules! build_test_binary_once {
                 use $crate::once_cell::sync::Lazy;
                 use std::ffi::OsString;
 
-                static [<lazy_path_to_ $name>]: Lazy<OsString> =
+                static [<LAZY_PATH_TO_ $name>]: Lazy<OsString> =
                     Lazy::new(|| $crate::build_test_binary(
                         stringify!($name),
                         $tests_dir
                     ).unwrap());
-                [<lazy_path_to_ $name>].clone()
+                [<LAZY_PATH_TO_ $name>].clone()
             }
         }
     };
