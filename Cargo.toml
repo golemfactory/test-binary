@@ -1,6 +1,6 @@
 [package]
 name = "test-binary"
-version = "3.0.1"
+version = "3.0.2"
 authors = ["Jason Heeris <jason.heeris@gmail.com>"]
 description = "Manage and build extra binaries for integration tests as regular Rust crates."
 keywords = [
