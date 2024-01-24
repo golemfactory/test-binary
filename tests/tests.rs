@@ -24,6 +24,7 @@ fn test_release() {
         "does-build",
         &PathBuf::from_iter(["testbins", "does-build", "Cargo.toml"]),
     )
+    .unwrap()
     .with_profile("release")
     .build();
 
@@ -81,6 +82,7 @@ fn test_features() {
         "feature-test",
         &PathBuf::from_iter(["testbins", "feature-test", "Cargo.toml"]),
     )
+    .unwrap()
     .no_default_features()
     .with_feature("working")
     .build();

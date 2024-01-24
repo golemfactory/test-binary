@@ -10,5 +10,5 @@ fn test_non_cargo_env() {
     remove_var("CARGO");
     remove_var("CARGO_MANIFEST_DIR");
     let result = build_test_binary("does-build", "testbins");
-    assert!(matches!(result, Err(TestBinaryError::NonCargoRun(_))));
+    assert!(matches!(result, Err(TestBinaryError::ManifestError(_))));
 }
