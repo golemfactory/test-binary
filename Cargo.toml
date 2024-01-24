@@ -27,6 +27,11 @@ exclude = [
     "testbins/**"
 ]
 
+[workspace]
+members = [
+    "workspace-bins/does-build"
+]
+
 [badges]
 maintenance = { status = "actively-developed" }
 

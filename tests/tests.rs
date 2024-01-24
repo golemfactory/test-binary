@@ -24,6 +24,7 @@ fn test_release() {
         "does-build",
         &PathBuf::from_iter(["testbins", "does-build", "Cargo.toml"]),
     )
+    .unwrap()
     .with_profile("release")
     .build();
 
@@ -81,9 +82,19 @@ fn test_features() {
         "feature-test",
         &PathBuf::from_iter(["testbins", "feature-test", "Cargo.toml"]),
     )
+    .unwrap()
     .no_default_features()
     .with_feature("working")
     .build();
 
     assert_path_end(result.unwrap(), "feature-test");
+}
+
+#[test]
+fn test_workspace_build() {
+    let result = TestBinary::from_workspace("does-build-new")
+        .unwrap()
+        .build();
+
+    assert_path_end(result.unwrap(), "does-build-new");
 }
