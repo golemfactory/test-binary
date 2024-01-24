@@ -89,3 +89,12 @@ fn test_features() {
 
     assert_path_end(result.unwrap(), "feature-test");
 }
+
+#[test]
+fn test_workspace_build() {
+    let result = TestBinary::from_workspace("does-build-new")
+        .unwrap()
+        .build();
+
+    assert_path_end(result.unwrap(), "does-build-new");
+}
