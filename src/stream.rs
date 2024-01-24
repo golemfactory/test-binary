@@ -25,7 +25,10 @@ pub(super) fn process_messages<R: BufRead>(
     for message in messages.flatten() {
         match message {
             // Hooray we found it!
-            Message::CompilerArtifact(artf) if (artf.target.name == binary_name) => {
+            Message::CompilerArtifact(artf)
+                if (artf.target.name == binary_name
+                    && artf.target.kind.contains(&"bin".to_string())) =>
+            {
                 cargo_outcome = Some(artf.executable.ok_or_else(|| {
                     // Wait no we didn't.
                     TestBinaryError::BinaryNotBuilt(binary_name.to_owned())
