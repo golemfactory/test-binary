@@ -140,8 +140,10 @@
 use std::{
     ffi::OsString,
     io::{BufReader, Read},
+    ops::Index,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    str::FromStr,
 };
 
 // For the build_test_binary_once macro.
@@ -189,7 +191,7 @@ macro_rules! push_oss {
 #[derive(Debug)]
 pub struct TestBinary<'a> {
     binary: &'a str,
-    manifest: &'a Path,
+    manifest: PathBuf,
     features: Vec<&'a str>,
     default_features: bool,
     profile: Option<&'a str>,
@@ -198,14 +200,28 @@ pub struct TestBinary<'a> {
 impl<'a> TestBinary<'a> {
     /// Creates a new `TestBinary` by specifying the child binary's manifest
     /// relative to the parent.
-    pub fn relative_to_parent(name: &'a str, manifest: &'a Path) -> Self {
-        Self {
+    pub fn relative_to_parent(name: &'a str, manifest: &'a Path) -> Result<Self, TestBinaryError> {
+        let manifest_path = manifest_dir()?.join(manifest);
+
+        Ok(Self {
             binary: name,
-            manifest,
+            manifest: manifest_path,
             features: vec![],
             default_features: true,
             profile: None,
-        }
+        })
+    }
+
+    /// Find binary in workspace and create `TestBinary` struct.
+    pub fn from_workspace(name: &'a str) -> Result<Self, TestBinaryError> {
+        let manifest_path = find_package(name)?;
+        Ok(Self {
+            binary: name,
+            manifest: manifest_path,
+            features: vec![],
+            default_features: true,
+            profile: None,
+        })
     }
 
     /// Specifies a profile to build the test binary with.
@@ -242,17 +258,12 @@ impl<'a> TestBinary<'a> {
         }
 
         let cargo_path = get_cargo_env("CARGO")?;
-
-        // Resolve test binary project manifest.
-        let mut manifest_path = PathBuf::from(get_cargo_env("CARGO_MANIFEST_DIR")?);
-        manifest_path.push(self.manifest);
-
         let mut cargo_args = vec_oss![
             "build",
             "--message-format=json",
             "-q",
             "--manifest-path",
-            manifest_path,
+            self.manifest.clone(),
             "--bin",
             self.binary,
         ];
@@ -343,8 +354,43 @@ pub fn build_test_binary<R: AsRef<Path>>(
     TestBinary::relative_to_parent(
         name,
         &PathBuf::from_iter([directory.as_ref(), name.as_ref(), "Cargo.toml".as_ref()]),
-    )
+    )?
     .build()
+}
+
+fn manifest_dir() -> Result<PathBuf, ManifestError> {
+    PathBuf::from_str(
+        &std::env::var("CARGO_MANIFEST_DIR")
+            .map_err(|e| ManifestError::EnvNotSet(e.to_string()))?,
+    )
+    .map_err(|e| ManifestError::EnvNotSet(e.to_string()))
+}
+
+/// Locates package in current workspace.
+/// Returns path to Cargo.toml defining package that will produce desired binary.
+fn find_package(bin: &str) -> Result<PathBuf, ManifestError> {
+    let manifest_dir = manifest_dir()?;
+    let manifest_path = manifest_dir.join("Cargo.toml");
+    let manifest = cargo_metadata::MetadataCommand::new()
+        .manifest_path(&manifest_path)
+        .exec()
+        .map_err(|e| ManifestError::ReadManifest(manifest_dir.to_path_buf(), e.to_string()))?;
+
+    let workspace_manifest = manifest.workspace_root.join("Cargo.toml");
+    let workspace = cargo_metadata::MetadataCommand::new()
+        .manifest_path(&workspace_manifest)
+        .exec()
+        .map_err(|e| {
+            ManifestError::ReadManifest(workspace_manifest.into_std_path_buf(), e.to_string())
+        })?;
+
+    for id in &workspace.workspace_members {
+        let package = workspace.index(id);
+        if package.name == bin {
+            return Ok(package.manifest_path.clone().into_std_path_buf());
+        }
+    }
+    Err(ManifestError::PackageNotFound(bin.to_string()))
 }
 
 /// Error type for build result.
@@ -366,6 +412,23 @@ pub enum TestBinaryError {
     /// in its build output.
     #[error(r#"could not find binary "{0}" in Cargo output"#)]
     BinaryNotBuilt(String),
+    /// Error processing manifests.
+    #[error("manifest error: {0}")]
+    ManifestError(#[from] ManifestError),
+}
+
+/// Error during reading manifests.
+#[derive(thiserror::Error, Debug)]
+pub enum ManifestError {
+    /// Workspace manifest doesn't contain info about package.
+    #[error("Package {0} not found")]
+    PackageNotFound(String),
+    /// Error when reading manifest.
+    #[error("Error reading manifest: {}. {1}", .0.display())]
+    ReadManifest(PathBuf, String),
+    /// Can't query path to manifest of current crate.
+    #[error("ENV variable `CARGO_MANIFEST_DIR` is not set. Error: {0}")]
+    EnvNotSet(String),
 }
 
 /// Generate a singleton function to save invoking Cargo multiple times for the
